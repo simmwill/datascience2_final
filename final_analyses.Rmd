@@ -9,11 +9,10 @@ editor_options:
 
 <!-- LaTeX Formatting -->
 \fancypagestyle{plain}{\pagestyle{fancy}}
-\fancyhead[LO,LE]{Meeraj Kothari & Will Simmons}
+\fancyhead[LO,LE]{Meeraj Kothari \& Will Simmons}
 \fancyhead[RO,RE]{P8106: Data Science II Final\newline 14 May 2020}
 
 ```{r, echo = FALSE, message = FALSE, warning = FALSE}
-library(cairoDevice)
 
 knitr::opts_chunk$set(
   echo = FALSE, 
@@ -44,7 +43,7 @@ The consequences of a changing climate are many and far-reaching. One consequenc
 
 Thus, we wanted to answer the questions: what factors predict ocean deoxygenation over time? Given these factors, are we able to accurately predict ocean oxygenation in new data? Oceanic levels of O~2~ determine global populations' access to food and other resources, and the ability to predict this information may guide policies by (1) generating potentially-useful information on factors important to preventing or slowing deoxygenation, and (2) demonstrating potential future trends.
 
-We are using data from the California Cooperative Oceanic Fisheries Investigations (CalCOFI), which we downloaded from Kaggle [\textcolor{blue}{(link)}](https://www.kaggle.com/sohier/calcofi). CalCOFI’s data represent the longest oceanographic time series in the world, spanning the years 1949 to 2016. Measured off the coast of California, the dataset includes larval and egg abundance data on 250+ species, as well as oceanographic data such as water temperature, salinity, chlorophyll, and oxygenation.
+We are using data from the California Cooperative Oceanic Fisheries Investigations (CalCOFI), which we downloaded from [\underline{Kaggle}](https://www.kaggle.com/sohier/calcofi). CalCOFI’s data represent the longest oceanographic time series in the world, spanning the years 1949 to 2016. Measured off the coast of California, the dataset includes larval and egg abundance data on 250+ species, as well as oceanographic data such as water temperature, salinity, chlorophyll, and oxygenation.
 
 Our primary outcome for these classification models is dissolved seawater oxygen in µmol/Kg, and whether a given observation is **above/below the median value for our dataset**.. A list of 14 predictors can be found in the Models section.
 
