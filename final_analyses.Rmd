@@ -1,0 +1,301 @@
+---
+output: pdf_document
+header-includes:
+  - \usepackage{fancyhdr}
+  - \pagestyle{fancy}
+editor_options: 
+  chunk_output_type: console
+---
+
+<!-- LaTeX Formatting -->
+\fancypagestyle{plain}{\pagestyle{fancy}}
+\fancyhead[LO,LE]{Meeraj Kothari & Will Simmons}
+\fancyhead[RO,RE]{P8106: Data Science II Final\newline 14 May 2020}
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+library(cairoDevice)
+
+knitr::opts_chunk$set(
+  echo = FALSE, 
+  message = FALSE, 
+  warning = FALSE
+)
+
+```
+
+
+```{r}
+
+library(tidyverse)
+library(conflicted)
+conflict_prefer("filter", "dplyr")
+library(readr)
+library(lubridate)
+library(caret)
+
+```
+
+
+## 1. **Introduction**
+
+*Background.*
+
+The consequences of a changing climate are many and far-reaching. One consequence that has gained significant attention over the past decade is ocean deoxygenation, a decrease in levels of dissolved O~2~. The impacts of ocean deoxygenation are only now becoming fully apparent: e.g. changes to ocean biogeochemistry, macro- and microorganism death due to hypoxia, and increased ocean production of nitrous oxide (N~2~O), a greenhouse gas (Keeling et al., 2010).
+
+Thus, we wanted to answer the questions: what factors predict ocean deoxygenation over time? Given these factors, are we able to accurately predict ocean oxygenation in new data? Oceanic levels of O~2~ determine global populations' access to food and other resources, and the ability to predict this information may guide policies by (1) generating potentially-useful information on factors important to preventing or slowing deoxygenation, and (2) demonstrating potential future trends.
+
+We are using data from the California Cooperative Oceanic Fisheries Investigations (CalCOFI), which we downloaded from Kaggle [\textcolor{blue}{(link)}](https://www.kaggle.com/sohier/calcofi). CalCOFI’s data represent the longest oceanographic time series in the world, spanning the years 1949 to 2016. Measured off the coast of California, the dataset includes larval and egg abundance data on 250+ species, as well as oceanographic data such as water temperature, salinity, chlorophyll, and oxygenation.
+
+Our primary outcome for these classification models is dissolved seawater oxygen in µmol/Kg, and whether a given observation is **above/below the median value for our dataset**.. A list of 14 predictors can be found in the Models section.
+
+*Data cleaning and preparation.*
+
+After downloading and importing the data, we cleaned and prepared it. We restricted the dataset to observations after 2008. The original timeseries was quite long (1949-2016, with 800k+ observations) and would have significantly increased computational effort; this also provides a more current (i.e. approximately prior-decade) interpretation of results. Then, since there was class imbalance in our outcome (above/below median oxygen saturation), we used `caret::downsample()` to randomly sample our data so that all classes have the same frequency as the minority class. Finally, for increased computational efficiency, we took a 20% random sample from the resulting downsampled dataset of ~25k, leaving us with ~5,000 observations.
+
+Next, we removed from consideration features with large amounts of missing data. We had selected a preliminary list of predictors, but several of these had large proportions of data missing. Finally, for the 14 features that remained (see Models for the final list), we removed any missing values for predictors. 
+
+After a final dataset was created for analytic purposes, training and testing datasets were created using `caret::createDataPartition()`, with 80 percent of data dedicated to training and 20 percent to testing. The training set was used for all subsequent analyses, including comparison of candidate models, with the testing set only used to evaluate the final chosen model.
+
+Using the training set, we explored outliers for all variables contained in the dataset. While some variables had extremely skewed distributions (e.g. right-skewed phaeophytin, ammonium, and nitrite concentrations), none had outliers visible from boxplots that warranted consideration of correction. Exploratory outlier visualizations are not shown in this document, but code for the boxplots is included in an appendix at the bottom of the submitted RMarkdown file.
+
+<!-- Importing Data -->
+
+```{r}
+
+# Bottle data - multiple bottles per cast
+bottle = read_csv('./data/bottle.csv',
+                  col_types = cols(.default = col_double()))
+
+# Cast data
+cast = read_csv('./data/cast.csv')
+
+```
+
+<!-- Cleaning/preparing data -->
+
+```{r}
+
+# Preparing dataset
+bottle_new = 
+  bottle %>% 
+  select(
+    Cst_Cnt,
+    Btl_Cnt,
+    Sta_ID,
+    RecInd,
+    R_Depth,
+    R_TEMP, T_degC,
+    R_POTEMP,
+    R_SALINITY, Salnty,
+    R_SIGMA, STheta,
+    R_CHLA, ChlorA,
+    R_PHAEO, Phaeop,
+    R_PO4, PO4uM,
+    R_SIO3, SiO3uM,
+    R_NO2, NO2uM,
+    R_NO3, NO3uM,
+    R_PRES,
+    R_SVA,
+    R_NH4, NH3uM,
+    C14As1, DarkAs, MeanAs, 
+    # DIC1, DIC2, TA1, TA2,      # Almost 100% missing
+    R_O2, O2ml_L, 
+    R_O2Sat, O2Sat,
+    oxy = `Oxy_µmol/Kg`
+  ) %>% 
+  left_join(
+    .,
+    cast %>% select(Cst_Cnt, Date, Lat_Dec, Lon_Dec),   # From cast data, only using: join variable, date, lat, long
+    by = "Cst_Cnt"
+  ) %>% 
+  mutate(
+    date = as.character(Date),
+    date = mdy(date),
+    month = floor_date(date, "month"),
+    year = year(date),
+    month_num = as.factor(month(date))
+  ) %>% 
+  filter(year >= 2008) %>%  # Reducing size of dataset
+  mutate(
+    year = as.factor(year)  # Changing year to factor
+  )
+  
+```
+
+<!-- Selecting variables for final dataset -->
+
+```{r}
+set.seed(1)
+
+median_oxy = 
+  bottle_new %>% 
+  select(oxy) %>% 
+  summarize(
+    median = median(oxy, na.rm = TRUE)
+  ) %>% 
+  as.numeric()
+
+data_pre =  
+  bottle_new %>% 
+  mutate(
+    outcome = case_when(oxy >= median_oxy ~ 'Above',   # Greater than or equal to median
+                        oxy <  median_oxy ~ 'Below'),  # Less than median
+    outcome = as.factor(outcome)
+  ) %>% 
+  select(
+    outcome,
+    date, 
+    month,
+    year,
+    month_num,
+    lat = Lat_Dec, long = Lon_Dec,
+    temp_c = R_TEMP,
+    sal = R_SALINITY,
+    p_dens = R_SIGMA,
+    pres = R_PRES,
+    phaeo = R_PHAEO,
+    po4 = R_PO4,
+    sio3 = R_SIO3,
+    no2 = R_NO2,
+    nh4 = R_NH4,          
+    chlor = R_CHLA,
+  ) %>% 
+  drop_na()           # Removing missing data
+
+
+data_pre %>% 
+  count(outcome)
+
+# Downsampling to create class balance - class membership of data above are 3:1 Above:Below 
+set.seed(1)
+data_pre_downsampled =
+  data_pre %>% 
+  select(-date, -month) %>% 
+  downSample(
+    x = .,                                               # Predictors
+    y = data_pre$outcome,                                # Factor w/ class memberships
+    list = FALSE
+  ) %>% 
+  as_tibble() %>% 
+  select(-Class)                                         # Function creates redundant Class variable
+
+data_pre_downsampled %>% 
+  count(outcome)
+
+# Now equal
+
+# Finally, reducing dataframe size to make analyses more manageable
+set.seed(1)
+data_final =
+  data_pre_downsampled %>% 
+  sample_frac(0.2)
+
+data_final %>% 
+  count(outcome)
+# Still approx. 1:1 class ratio
+
+```
+
+<!-- Creating train/test sets -->
+
+```{r}
+set.seed(1)
+# Creating training and testing datasets
+
+train_idx =
+  createDataPartition(data_final$outcome,
+                      p = .8,
+                      list = F)
+
+# 14 predictors, 1 outcome
+
+train =
+  data_final[train_idx[,1], ]
+
+test =
+  data_final[-train_idx[,1], ]
+
+rm(train_idx, bottle, bottle_new, cast)
+
+```
+
+## 2. **Exploratory analysis/visualization**
+
+__*2.a.  Correlation.*__
+
+A correlation matrix was created (see Figure 1) to estimate linear (Pearson's) correlation values among all features. Several features were highly correlated, particularly the feature pairs temperature/potential density, SiO~3~/PO~4~, and PO~4~/potential density. Since correlation amongst predictors can cause problems, we were careful to consider these highly-correlated predictors in both model selection and interpretation.
+
+__*2.b.  Cluster analysis.*__
+
+[...]
+
+## 3. **Models** 
+
+__*3.a.  Candidate models.*__
+
+[...]
+
+__*3.b.  Tuning.*__
+
+[...]
+
+__*3.c.  Final Model.*__
+
+[...]
+
+*3.c.i.   Test error rate.* 
+
+*3.c.ii.  Important variables.*
+
+*3.c.iii. Interpretation and limitations.* 
+
+## 4. **Conclusions**
+
+__*4.a.  Summary of findings.*__ 
+
+...
+
+__*4.b.  Limitations of findings.*__
+
+These data were exclusively gathered in the Pacific Ocean off the coast of California; thus, these prediction models and any interpretations may not be generalizable to data outside of this geographic area. Additionally, we limited analyses to data from 2008-2016, which may limit temporal interpretation.
+
+<br>
+<br>
+<br>
+
+# References
+
+Keeling RF, Kortzinger A,  Gruber N (2010). Ocean Deoxygenation in a Warming World. Annu Rev Marine Sci, 2:463–93.
+
+Watson AJ, Lenton TM, Mills BJW (2017). Ocean deoxygenation, the global phosphorus cycle and the possibility of human-caused large-scale ocean anoxia. Philos Trans A Math Phys Eng Sci, 375(2102).
+
+\newpage
+
+# Appendix: Figures & Tables
+
+<!-- Figure 1: Correlation matrix --> 
+
+```{r, fig.align = 'center', fig.fullwidth = TRUE}
+# Correlation plot 
+# fig1 =
+  train %>% 
+  select(year, month_num, everything(), -outcome) %>% 
+  rename(NH4 = nh4, NO2 = no2, SiO3 = sio3, PO4 = po4,
+         chlorophyll = chlor,
+         phaeophytin = phaeo,
+         pressure = pres,
+         density = p_dens,
+         salinity = sal,
+         month = month_num) %>% 
+  mutate(month = as.numeric(month),
+         year = as.numeric(year)) %>% 
+  cor() %>% 
+  ggcorrplot::ggcorrplot(type = "lower",
+                         colors = c("#ED6A5A", "#FFFFF9", "#36C9C6"),
+                         show.diag = FALSE,
+                         lab = TRUE,
+                         lab_size = 1.75) +
+  labs(title = "Figure 1. Correlation matrix of features") +
+  theme(plot.title.position = "plot",
+        legend.position = "bottom")
+```
