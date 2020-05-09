@@ -31,7 +31,10 @@ conflict_prefer("filter", "dplyr")
 library(readr)
 library(lubridate)
 library(caret)
-
+library(glmnet)
+library(e1071)
+library(mlbench)
+library(pROC)
 ```
 
 
@@ -232,9 +235,48 @@ __*2.b.  Cluster analysis.*__
 
 __*3.a.  Candidate models.*__
 
+*3.a.i.   Logistic Regression* 
+
+```{r}
+ctrl <- trainControl(method = "repeatedcv",
+                     repeats = 5,
+                     summaryFunction = twoClassSummary,
+                     classProbs = T)
+
+set.seed(1)
+glm.fit <- train(outcome ~ .,
+                 data = train,
+                 method = "glm",
+                 metric = "ROC", 
+                 trControl = ctrl)
+
+contrasts(data_final$outcome)
+```
+
+*3.a.ii.   K-Nearest Neighbors* 
+
+```{r}
+set.seed(1)
+
+knn.fit <- train(outcome ~ .,
+                 data = train, 
+                 method = "knn",
+                 tuneGrid = data.frame(k = seq(1, 100, by = 5)),
+                 trControl = ctrl)
+
+ggplot(knn.fit, highlight = T)
+```
+
 [...]
 
 __*3.b.  Tuning.*__
+
+```{r}
+res <- resamples(list(GLM = glm.fit, 
+                     KNN = knn.fit))
+
+bwplot(res, "ROC")
+```
 
 [...]
 
