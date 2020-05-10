@@ -35,10 +35,15 @@ library(glmnet)
 library(e1071)
 library(mlbench)
 library(pROC)
+library(factoextra)
 ```
 
 
 ## 1. **Introduction**
+
+*Note on updated results.*
+
+For this final project, our group used the same dataset (see below for more info) but binarized our outcome, oceanic oxygen saturation, to **above/below median** for the timerange observed in our analyses. We have modified the text below from our midterm analyses to apply to our new methods and outcome measure.
 
 *Background.*
 
@@ -52,7 +57,7 @@ Our primary outcome for these classification models is dissolved seawater oxygen
 
 *Data cleaning and preparation.*
 
-After downloading and importing the data, we cleaned and prepared it. We restricted the dataset to observations after 2008. The original timeseries was quite long (1949-2016, with 800k+ observations) and would have significantly increased computational effort; this also provides a more current (i.e. approximately prior-decade) interpretation of results. Then, since there was class imbalance in our outcome (above/below median oxygen saturation), we used `caret::downsample()` to randomly sample our data so that all classes have the same frequency as the minority class. Finally, for increased computational efficiency, we took a 20% random sample from the resulting downsampled dataset of ~25k, leaving us with ~5,000 observations.
+After downloading and importing the data, we cleaned and prepared it. We restricted the dataset to observations after 2008. The original timeseries was quite long (1949-2016, with 800k+ observations) and would have significantly increased computational effort; this also provides a more current (i.e. approximately prior-decade) interpretation of results. Then, since there was class imbalance in our outcome (above/below median oxygen saturation), we used `caret::downsample()` to randomly sample our data so that all classes have the same frequency as the minority class. Finally, for increased computational efficiency, we took a 5% random sample from the resulting downsampled dataset of ~25k, leaving us with ~1,200 observations.
 
 Next, we removed from consideration features with large amounts of missing data. We had selected a preliminary list of predictors, but several of these had large proportions of data missing. Finally, for the 14 features that remained (see Models for the final list), we removed any missing values for predictors. 
 
@@ -162,6 +167,12 @@ data_pre =
     nh4 = R_NH4,          
     chlor = R_CHLA,
   ) %>% 
+  mutate(season = case_when(month_num %in% c(12, 1, 2) ~ 'Winter',
+                            month_num %in% c(3:5) ~ 'Spring',
+                            month_num %in% c(6:8) ~ 'Summer',
+                            month_num %in% c(9:11) ~ 'Fall'),
+         season = as.factor(season)
+  ) %>% 
   drop_na()           # Removing missing data
 
 
@@ -172,7 +183,7 @@ data_pre %>%
 set.seed(1)
 data_pre_downsampled =
   data_pre %>% 
-  select(-date, -month) %>% 
+  select(-date, -month, -month_num) %>% 
   downSample(
     x = .,                                               # Predictors
     y = data_pre$outcome,                                # Factor w/ class memberships
@@ -190,7 +201,7 @@ data_pre_downsampled %>%
 set.seed(1)
 data_final =
   data_pre_downsampled %>% 
-  sample_frac(0.2)
+  sample_frac(0.05)
 
 data_final %>% 
   count(outcome)
@@ -227,19 +238,98 @@ __*2.a.  Correlation.*__
 
 A correlation matrix was created (see Figure 1) to estimate linear (Pearson's) correlation values among all features. Several features were highly correlated, particularly the feature pairs temperature/potential density, SiO~3~/PO~4~, and PO~4~/potential density. Since correlation amongst predictors can cause problems, we were careful to consider these highly-correlated predictors in both model selection and interpretation.
 
+```{r}
+
+train %>% 
+  mutate(outcome = as.numeric(outcome),
+         year = as.numeric(year),
+         season = as.numeric(season)
+  ) %>% 
+  cor() %>% 
+  ggcorrplot::ggcorrplot(type = "lower",
+                         colors = c("#ED6A5A", "#FFFFF9", "#36C9C6"),
+                         show.diag = FALSE,
+                         lab = TRUE,
+                         lab_size = 1.75) +
+  labs(title = "Figure 1. Correlation matrix of outcome and features",
+       subtitle = "CALCOFI, 2008-2016") +
+  theme(plot.title.position = "plot",
+        legend.position = "bottom") 
+
+```
+
 __*2.b.  Cluster analysis.*__
 
-[...]
+To explore potential structures and patterns in our data, we performed K-means clustering on our data, determining a `K` value of 3 via the silhouette method.
+
+We performed this cluster analysis on all numeric predictors [latitude and longitude (decimals), temperature (°C), salinity (PSS-78 scale), potential water density (kg/m^3^), pressure (decibars), phaeophytin (µg/L), chlorophyll (µg/L), phosphate (µmol/L), silicate (µmol/L), nitrite (µmol/L), and ammonium (µmol/L)]. 
+
+In Figure 2, we plotted K-means clusters by scaled and centered mean values for numeric predictors. A few interesting patterns emerged, which were complementary to our correlation matrix in Figure 1: certain substances found in water were positively correlated and thus found in certain clusters together, such as `chlor` (chlorophyll), `nh4` (ammonium), and `no2` (nitrite). In addition, certain factors such as `temp_c` (temperature) and `pres` (pressure) were inversely correlated, as would be expected given different sample depths.
+
+```{r}
+
+fviz_nbclust(clust_data,
+             FUNcluster = kmeans,
+             method = "silhouette")
+set.seed(1)
+km <- kmeans(clust_data, centers = 3, nstart = 20)
+
+library(viridis)
+# km_vis <- fviz_cluster(list(data = clust_data, cluster = km$cluster), 
+#                        ellipse.type = "convex", 
+#                        geom = c("point","text"),
+#                        labelsize = 5, 
+#                        palette = "Dark2") + 
+#           labs(title = "Figure 2. K-means cluster analysis: Plot of first two principal components",
+#                subtitle = "CALCOFI, 2008-2016") +
+#           scale_shape("Cluster") + 
+#           scale_fill_viridis_d("Cluster") + 
+#           scale_color_viridis_d("Cluster") +
+#           theme_bw()
+# 
+# km_vis
+
+a = print(km)
+a$centers %>% as_tibble() %>% mutate(Cluster = as.factor(1:3)) %>% select(Cluster, everything()) %>% 
+  pivot_longer(
+    lat:chlor,
+    names_to = "var",
+    values_to = "mean"
+  ) %>% 
+  ggplot(aes(x = var, y = mean, fill = Cluster)) +
+  geom_bar(stat = 'identity') +
+  facet_grid(~Cluster) +
+  labs(x = "",
+       title = "Figure 2. K-means cluster analysis: Clusters by centered and scaled mean values",
+       subtitle = "CALCOFI, 2008-2016") +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45,
+                               vjust = 1, 
+                               hjust = 1)
+  ) +
+  scale_fill_viridis_d("") 
+
+```
+
 
 ## 3. **Models** 
 
 __*3.a.  Candidate models.*__
+
+For each candidate model, the 14 predictors included were as follows: year, season, latitude and longitude (decimals), temperature (°C), salinity (PSS-78 scale), potential water density (kg/m^3^), pressure (decibars), phaeophytin (µg/L), chlorophyll (µg/L), phosphate (µmol/L), silicate (µmol/L), nitrite (µmol/L), and ammonium (µmol/L).
+
+We began by fitting several models using `caret::train()` using our training data, and comparing them using their respective cross-validated (CV) Accuracy and ROC values. **Figure 3** details the cross-validated distribution of model metrics for each model.
+
+We began with a logistic regression model as a baseline model. We then compared this with more flexible methods: K-nearest neighbors (KNN), a support vector classifier with a linear kernel (SVC), and a support vector machine with a radial kernel (SVM). 
 
 *3.a.i.   Logistic Regression* 
 
 ```{r}
 ctrl <- trainControl(method = "repeatedcv",
                      repeats = 5,
+                     number = 5,
                      summaryFunction = twoClassSummary,
                      classProbs = T)
 
@@ -247,10 +337,20 @@ set.seed(1)
 glm.fit <- train(outcome ~ .,
                  data = train,
                  method = "glm",
-                 metric = "ROC", 
+                 metric = "ROC",
                  trControl = ctrl)
 
 contrasts(data_final$outcome)
+
+# ROC curve
+glm_pred = predict(glm.fit, newdata = train)
+glm_roc = roc(train$outcome, as.numeric(glm_pred)) # Have to use numeric version
+
+# plot(glm_roc)
+# 
+# confusionMatrix(data = glm_pred, 
+#                 reference = train$outcome)
+
 ```
 
 *3.a.ii.   K-Nearest Neighbors* 
@@ -258,24 +358,92 @@ contrasts(data_final$outcome)
 ```{r}
 set.seed(1)
 
-knn.fit <- train(outcome ~ .,
-                 data = train, 
-                 method = "knn",
-                 tuneGrid = data.frame(k = seq(1, 100, by = 5)),
-                 trControl = ctrl)
+# knn.fit <- train(outcome ~ .,
+#                  data = train, 
+#                  method = "knn",
+#                  metric = "ROC",
+#                  tuneGrid = data.frame(k = seq(1, 100, by = 5)),
+#                  trControl = ctrl)
+
+# Saving to make knitting faster
+# saveRDS(knn.fit, './models/knn.RDS')
+knn.fit = readRDS('./models/knn.RDS')
 
 ggplot(knn.fit, highlight = T)
+
 ```
 
-[...]
+*3.a.iii.  Linear Support Vector Classifier (SVC)*
+
+```{r}
+
+set.seed(1)
+# svml = train(outcome ~ .,
+#              data = train,
+#              method = "svmLinear2",
+#              preProcess = c("center", "scale"),
+#              metric = "ROC",
+#              tuneGrid = data.frame(cost = exp(seq(1, 5, length = 20))),
+#              trControl = ctrl)
+# beepr::beep(sound = "mario") 
+
+# saveRDS(svml, './models/svml.RDS')
+svml = readRDS('./models/svml.RDS')
+
+ggplot(svml, highlight = TRUE)
+
+# Try this to visualize
+# kernlab::plot(svml$finalModel,
+#      train,
+#      formula = outcome ~ chlor)
+# plot(svml, train)
+
+```
+
+*3.a.iv.  Radial Kernel Support Vector Machine (SVM)*
+
+```{r}
+
+r_grid = expand.grid(C = exp(seq(1, 8, length = 15)),
+                     sigma = exp(seq(-9, -6, length = 10)))
+
+set.seed(1)             
+# svmr = train(outcome ~ .,
+#              data = train,
+#              method = "svmRadial",
+#              preProcess = c("center", "scale"),
+#              tuneGrid = r_grid,
+#              trControl = ctrl)
+
+# saveRDS(svmr, './models/svmr.RDS')
+svmr = readRDS('./models/svmr.RDS')
+
+ggplot(svmr, highlight = TRUE)
+
+# Try these to visualize
+# plot(svmr$finalModel)
+# plot(svmr, train)
+
+```
+
 
 __*3.b.  Tuning.*__
 
-```{r}
-res <- resamples(list(GLM = glm.fit, 
-                     KNN = knn.fit))
+We tuned each candidate model's tuning parameter(s) using 5 repeats of 10-fold cross validation. The KNN model was tuned over a grid of `K` values ranging from 1 to 100 in increments of 5. The SVC model was tuned over a grid of 20 `cost` values ranging from *exp*(5) to *exp*(8). Finally, the SVM model was tuned over a grid of two parameters: 10 `cost` parameters ranging from *exp*(-1) to *exp*(4), and 10 `sigma` values ranging from *exp*(-6) to *exp*(-2).
 
-bwplot(res, "ROC")
+Final candidate models were then compared using CV accuracy and ROC distributions, and the final model was selected using the model with the lowest median CV metric values. More details can be found in the submitted RMarkdown file.
+
+```{r}
+
+res <- resamples(list(GLM = glm.fit, 
+                      KNN = knn.fit,
+                      SVC = svml,
+                      SVM = svmr
+  )
+)
+
+bwplot(res)
+
 ```
 
 [...]
@@ -284,11 +452,13 @@ __*3.c.  Final Model.*__
 
 [...]
 
-*3.c.i.   Test error rate.* 
+*3.c.i.   Test error rate.* Upon evaluating the MARS model using our test data, the test error rate was equal to `r ...`.
 
-*3.c.ii.  Important variables.*
+*3.c.ii.  Important variables.* The most important variable in our final model, the ___ model, was ___.
 
 *3.c.iii. Interpretation and limitations.* 
+
+(e.g. assumptions of final model, flexibility to capture underlying truth, limitations)
 
 ## 4. **Conclusions**
 
@@ -340,3 +510,50 @@ Watson AJ, Lenton TM, Mills BJW (2017). Ocean deoxygenation, the global phosphor
   theme(plot.title.position = "plot",
         legend.position = "bottom")
 ```
+
+
+
+
+<!-- SEE BELOW FOR UNINCLUDED WORK -->
+
+
+
+
+
+
+
+<!-- ### Appendix 2: Unincluded Work ### -->
+
+<!-- 1. Exploratory Outlier Visualization -->
+
+```{r, include = FALSE, eval = FALSE}
+
+# Outlier analysis using boxplots
+# outlier_check = function(predictor, xlab) {
+#   
+#   train %>% 
+#     ggplot(aes_string(y = predictor)) +
+#     geom_boxplot() +
+#     labs(y = paste0(xlab))
+#   
+# }
+# 
+# boxplot_list = pmap(predictor_list, outlier_check)
+# Manually call boxplots to assess each variable for outliers, e.g. boxplot_list[[2]]
+
+```
+
+<!-- 2. Gap Statistic Plot Code -->
+
+```{r, include = FALSE, eval = FALSE}
+
+# set.seed(1)
+# gap = cluster::clusGap(clust_data, FUN = hcut, nstart = 25, K.max = 15, B = 10)
+# gap2 = cluster::clusGap(clust_data, FUN = hcut, nstart = 25, K.max = 15, B = 10, method = "Tibs2001SEmax")
+# fviz_gap_stat(gap)
+# fviz_gap_stat(gap2)
+
+## Both methods yield k = 3
+
+```
+

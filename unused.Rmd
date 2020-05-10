@@ -1,0 +1,67 @@
+---
+title: "Unused Code and Writing"
+author: "Will Simmons"
+date: "5/9/2020"
+output: html_document
+---
+
+To explore potential structures and patterns in our data, we performed hierarchical clustering on our data using complete linkage and Euclidean distance. Using the cluster value for which the gap statistic reached its first local maximum, we decided on 3 clusters for our hierarchical clustering analysis (see RMarkdown file for code used for gap statistic and plot). 
+
+We performed this cluster analysis on all numeric predictors [latitude and longitude (decimals), temperature (°C), salinity (PSS-78 scale), potential water density (kg/m^3^), pressure (decibars), phaeophytin (µg/L), chlorophyll (µg/L), phosphate (µmol/L), silicate (µmol/L), nitrite (µmol/L), and ammonium (µmol/L)]. There were few notable patterns or structures in our data, but our hierarchical clustering did reveal some extreme values (Figure 2). 
+
+```{r}
+
+clust_data =
+  train %>% 
+  select_if(is.numeric) %>% 
+  scale()
+
+set.seed(1)
+hc.complete = hclust(dist(clust_data), method = "complete")
+
+dendro =
+  factoextra::fviz_dend(
+          hc.complete, k = 3,        
+          cex = 0.3, 
+          palette = "jco", 
+          color_labels_by_k = TRUE,
+          rect = TRUE, rect_fill = TRUE, rect_border = "jco",
+          labels_track_height = 2.5)
+
+sub_grp = cutree(hc.complete, k = 3)
+# table(sub_grp)
+
+# Group 1 - overall data minus 4 observations
+train %>% select_if(is.numeric) %>% colMeans() # for comparison to overall data
+train[sub_grp == 1,] %>% select_if(is.numeric) %>% colMeans()
+
+# Group 2 - low pressure, high phaeo, high NO2, high NH4, high chlor
+train %>% select_if(is.numeric) %>% colMeans() # for comparison to overall data
+train[sub_grp == 2,] %>% select_if(is.numeric) %>% colMeans()
+
+# Group 3 - low pressure, high phaeo, high NH4, high chlor
+train %>% select_if(is.numeric) %>% colMeans() # for comparison to overall data
+train[sub_grp == 3,] %>% select_if(is.numeric) %>% colMeans()
+
+
+
+dend_data = attr(dendro, "dendrogram")
+
+hc_cut = cut(dend_data, h = 9.5)
+hc_cut
+
+factoextra::fviz_dend(
+  hc_cut$upper,
+  palette = "jco", 
+  rect = TRUE, rect_fill = TRUE, rect_border = "jco"
+)
+
+table()
+
+# Who are in the fourth cluster?
+ind4.complete <- cutree(hc.complete, 4)
+dat[ind4.complete == 4,]
+
+```
+
+
