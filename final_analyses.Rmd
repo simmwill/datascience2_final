@@ -451,16 +451,22 @@ The following plot shows the test performance of the models using ROC curves:
 ```{r}
 glm.pred <- predict(glm.fit, newdata = test, type = "prob")[,2]
 knn.pred <- predict(knn.fit, newdata = test, type = "prob")[,2]
+svml.pred <- predict(svml, newdata = test, type = "prob")[,2]
+svmr.pred <- predict(svmr, newdata = test, type = "prob")[,2]
 
 roc.glm <- roc(test$outcome, glm.pred)
 roc.knn <- roc(test$outcome, knn.pred)
+roc.svml <- roc(test$outcome, svml.pred)
+roc.svmr <- roc(test$outcome, svmr.pred)
 
-auc <- c(roc.glm$auc[1], roc.knn$auc[1])
+auc <- c(roc.glm$auc[1], roc.knn$auc[1], roc.svml$auc[1], roc.svmr$auc[1])
 
 plot(roc.glm, legacy.axes = T)
 plot(roc.knn, col = 2, add = T)
-modelNames <- c("glm", "knn")
-legend("bottomright", legend = paste0(modelNames, ":", round(auc, 3)), col = 1:2, lwd = 2)
+plot(roc.svml, col = 3, add = T)
+plot(roc.svmr, col = 4, add = T)
+modelNames <- c("glm", "knn", "svml", "svmr")
+legend("bottomright", legend = paste0(modelNames, ":", round(auc, 3)), col = 1:4, lwd = 2)
 ```
 
 [...]
