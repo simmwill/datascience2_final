@@ -142,6 +142,15 @@ median_oxy =
   ) %>% 
   as.numeric()
 
+# New oxy median - baseline year (2008)
+median_oxy_baseline = 
+  bottle_new %>% 
+  select(year, oxy) %>% 
+  mutate(year = as.numeric(as.character(year))) %>% 
+  filter(year == 2008) %>% 
+  summarize(median_baseline = median(oxy, na.rm = TRUE)) %>% 
+  as.numeric()
+
 data_pre =  
   bottle_new %>% 
   mutate(
@@ -431,7 +440,7 @@ __*3.b.  Tuning.*__
 
 We tuned each candidate model's tuning parameter(s) using 5 repeats of 10-fold cross validation. The KNN model was tuned over a grid of `K` values ranging from 1 to 100 in increments of 5. The SVC model was tuned over a grid of 20 `cost` values ranging from *exp*(5) to *exp*(8). Finally, the SVM model was tuned over a grid of two parameters: 10 `cost` parameters ranging from *exp*(-1) to *exp*(4), and 10 `sigma` values ranging from *exp*(-6) to *exp*(-2).
 
-Final candidate models were then compared using CV accuracy and ROC distributions, and the final model was selected using the model with the lowest median CV metric values. More details can be found in the submitted RMarkdown file.
+Final candidate models were then compared using CV accuracy and ROC distributions, and the final model was selected using the model with the lowest median CV ROC value. More details can be found in the submitted RMarkdown file.
 
 ```{r}
 
@@ -466,7 +475,7 @@ plot(roc.knn, col = 2, add = T)
 plot(roc.svml, col = 3, add = T)
 plot(roc.svmr, col = 4, add = T)
 modelNames <- c("glm", "knn", "svml", "svmr")
-legend("bottomright", legend = paste0(modelNames, ":", round(auc, 3)), col = 1:4, lwd = 2)
+legend("bottomright", legend = paste0(modelNames, ": ", round(auc, 3)), col = 1:4, lwd = 2)
 ```
 
 [...]
