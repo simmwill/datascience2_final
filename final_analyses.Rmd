@@ -247,35 +247,36 @@ rm(train_idx, bottle, bottle_new, cast)
 
 __*2.a.  Correlation.*__
 
-A correlation matrix was created (Figure 1) to estimate linear (Pearson's) correlation values among all features. Several features were highly correlated, particularly the feature pairs temperature/potential density, SiO~3~/PO~4~, and PO~4~/potential density. Since correlation amongst predictors can cause problems, we were careful to consider these highly-correlated predictors in both model selection and interpretation.
+We created a correlation matrix (**Figure 1**) to estimate linear (Pearson's) correlation values among all features. Several features were highly correlated, particularly the feature pairs temperature/potential density, SiO~3~/PO~4~, and PO~4~/potential density. Since correlation amongst predictors can cause problems, we were careful to consider these highly-correlated predictors in both model selection and interpretation.
 
 ```{r}
+# Figure 1 below in Appendix 1
 
-train %>% 
-  mutate(outcome = as.numeric(outcome),
-         year = as.numeric(year),
-         season = as.numeric(season)
-  ) %>% 
-  cor() %>% 
-  ggcorrplot::ggcorrplot(type = "lower",
-                         colors = c("#ED6A5A", "#FFFFF9", "#36C9C6"),
-                         show.diag = FALSE,
-                         lab = TRUE,
-                         lab_size = 1.75) +
-  labs(title = "Figure 1. Correlation matrix of outcome and features",
-       subtitle = "CALCOFI, 2008-2016") +
-  theme(plot.title.position = "plot",
-        legend.position = "bottom") 
+# train %>% 
+#   mutate(outcome = as.numeric(outcome),
+#          year = as.numeric(year),
+#          season = as.numeric(season)
+#   ) %>% 
+#   cor() %>% 
+#   ggcorrplot::ggcorrplot(type = "lower",
+#                          colors = c("#ED6A5A", "#FFFFF9", "#36C9C6"),
+#                          show.diag = FALSE,
+#                          lab = TRUE,
+#                          lab_size = 1.75) +
+#   labs(title = "Figure 1. Correlation matrix of outcome and features",
+#        subtitle = "CALCOFI, 2008-2016") +
+#   theme(plot.title.position = "plot",
+#         legend.position = "bottom") 
 
 ```
 
 __*2.b.  Cluster analysis.*__
 
-To explore potential structures and patterns in our data, we performed K-means clustering on our data, determining a `K` value of 3 via the silhouette method.
+To explore potential structures and patterns in our data, we performed K-means clustering on our data, determining a `K` value of 3 via the silhouette method. (See **Figure S1** for our K-means tuning parameter plot.)
 
 We performed this cluster analysis on all numeric predictors [latitude and longitude (decimals), temperature (°C), salinity (PSS-78 scale), potential water density (kg/m^3^), pressure (decibars), phaeophytin (µg/L), chlorophyll (µg/L), phosphate (µmol/L), silicate (µmol/L), nitrite (µmol/L), and ammonium (µmol/L)]. 
 
-In Figure 2, we plotted K-means clusters by scaled and centered mean values for numeric predictors. A few interesting patterns emerged, which were complementary to our correlation matrix in Figure 1: certain substances found in water were positively correlated and thus found in certain clusters together, such as `chlor` (chlorophyll), `nh4` (ammonium), and `no2` (nitrite). In addition, certain factors such as `temp_c` (temperature) and `pres` (pressure) were inversely correlated, as would be expected given different sample depths.
+In **Figure 2**, we plotted K-means clusters by scaled and centered mean values for numeric predictors. A few interesting patterns emerged, which were complementary to our correlation matrix in **Figure 1**: certain substances found in water were positively correlated and thus found in certain clusters together, such as `chlor` (chlorophyll), `nh4` (ammonium), and `no2` (nitrite). In addition, certain factors such as `temp_c` (temperature) and `pres` (pressure) were inversely correlated, as would be expected given different sample depths.
 
 ```{r}
 
@@ -284,11 +285,12 @@ clust_data =
   select_if(is.numeric) %>% 
   scale()
 
-fviz_nbclust(clust_data,
-             FUNcluster = kmeans,
-             method = "silhouette") +
-  labs(title = "Figure S1. Tuning K-means cluster analysis via silhouette method",
-       subtitle = "Optimal k value of 3")
+# Figure S1 in Appendix II below
+# fviz_nbclust(clust_data,
+#              FUNcluster = kmeans,
+#              method = "silhouette") +
+#   labs(title = "Figure S1. Tuning K-means cluster analysis via silhouette method",
+#        subtitle = "Optimal k value of 3")
 
 set.seed(1)
 km <- kmeans(clust_data, centers = 3, nstart = 20)
@@ -308,56 +310,17 @@ library(viridis)
 # 
 # km_vis
 
-a = print(km)
-a$centers %>% as_tibble() %>% mutate(Cluster = as.factor(1:3)) %>% select(Cluster, everything()) %>% 
-rename(NH4 = nh4, NO2 = no2, SiO3 = sio3, PO4 = po4,
-     Temperature = temp_c,
-     Chlorophyll = chlor,
-     Phaeophytin = phaeo,
-     Pressure = pres,
-     Density = p_dens,
-     Salinity = sal,
-     Latitude = lat, Longitude = long) %>% 
-  pivot_longer(
-    Latitude:Chlorophyll,
-    names_to = "var",
-    values_to = "mean"
-  ) %>% 
-  ggplot(aes(x = var, y = mean, fill = Cluster)) +
-  geom_bar(stat = 'identity') +
-  facet_grid(~Cluster) +
-  labs(x = "",
-       y = "Centered/scaled mean value",
-       title = "Figure 2. K-means cluster analysis: Clusters by centered and scaled mean values",
-       subtitle = "CALCOFI, 2008-2016") +
-  theme_bw() +
-  theme(
-    legend.position = "none",
-    axis.text.x = element_text(angle = 45,
-                               vjust = 1, 
-                               hjust = 1)
-  ) +
-  scale_fill_viridis_d("") 
+# Figure 2 below in Appendix
 
 ```
 
-__*2.c.  Predictor scatterplots*__
+<!-- __*2.c.  Predictor scatterplots*__ -->
 
 ```{r}
 
 
-featurePlot(x = train %>% select_if(is.numeric) %>% select(-lat,-long),
-            plot = "pairs",
-            y = train$outcome,
-            auto.key = list(columns = 2),
-            main = list(
-              "Figure 3. Scatterplot matrix: predictors vs. outcome",
-              adj = 0),
-            scales = list(
-              x = list(cex = .1)
-              )
-            )
-plot.new()
+# Figure 3 below in Appendix
+
 
 ```
 
@@ -371,7 +334,7 @@ We began by fitting several models using `caret::train()` using our training dat
 
 We began with a logistic regression model as a baseline model. We then compared this with more flexible methods: K-nearest neighbors (KNN), a support vector classifier with a linear kernel (SVC), and a support vector machine with a radial kernel (SVM). 
 
-*3.a.i.   Logistic Regression* 
+<!-- *3.a.i.   Logistic Regression*  -->
 
 ```{r}
 ctrl <- trainControl(method = "repeatedcv",
@@ -387,7 +350,7 @@ glm.fit <- train(outcome ~ .,
                  metric = "ROC",
                  trControl = ctrl)
 
-contrasts(data_final$outcome)
+# contrasts(data_final$outcome)
 
 # ROC curve
 glm_pred = predict(glm.fit, newdata = train)
@@ -400,7 +363,7 @@ glm_roc = roc(train$outcome, as.numeric(glm_pred)) # Have to use numeric version
 
 ```
 
-*3.a.ii.   K-Nearest Neighbors* 
+<!-- *3.a.ii.   K-Nearest Neighbors*  -->
 
 ```{r}
 set.seed(1)
@@ -416,14 +379,15 @@ set.seed(1)
 # saveRDS(knn.fit, './models/knn.RDS')
 knn.fit = readRDS('./models/knn.RDS')
 
-ggplot(knn.fit, highlight = T) +
-  theme_bw() +
-  labs(title = "Figure S2. Tuning K-nearest neighbor model's `k` parameter using ROC",
-       subtitle = "Optimal k value of 11")
+# Figure S2 below in Appendix II
+# ggplot(knn.fit, highlight = T) +
+#   theme_bw() +
+#   labs(title = "Figure S2. Tuning K-nearest neighbor model's `k` parameter using ROC",
+#        subtitle = "Optimal k value of 11")
 
 ```
 
-*3.a.iii.  Linear Support Vector Classifier (SVC)*
+<!-- *3.a.iii.  Linear Support Vector Classifier (SVC)* -->
 
 ```{r}
 
@@ -440,14 +404,15 @@ set.seed(1)
 # saveRDS(svml, './models/svml.RDS')
 svml = readRDS('./models/svml.RDS')
 
-ggplot(svml, highlight = TRUE) +
-  theme_bw() +
-  labs(title = "Figure S3. Tuning linear support vector classifier model's cost parameter using ROC",
-       subtitle = "Optimal cost value of 6.31")
+# Figure S3 below in Appendix II
+# ggplot(svml, highlight = TRUE) +
+#   theme_bw() +
+#   labs(title = "Figure S3. Tuning linear support vector classifier model's cost parameter using ROC",
+#        subtitle = "Optimal cost value of 6.31")
 
 ```
 
-*3.a.iv.  Radial Kernel Support Vector Machine (SVM)*
+<!-- *3.a.iv.  Radial Kernel Support Vector Machine (SVM)* -->
 
 ```{r}
 
@@ -465,18 +430,19 @@ set.seed(1)
 # saveRDS(svmr, './models/svmr.RDS')
 svmr = readRDS('./models/svmr.RDS')
 
-ggplot(svmr, highlight = TRUE) +
-  theme_bw() +
-  labs(title = "Figure S4. Tuning radial support vector machine's cost and sigma parameters using ROC",
-       subtitle = "Cost = 244.69, sigma = 0.00248")
+# Figure S4 in Appendix II below
+# ggplot(svmr, highlight = TRUE) +
+#   theme_bw() +
+#   labs(title = "Figure S4. Tuning radial support vector machine's cost and sigma parameters using ROC",
+#        subtitle = "Cost = 244.69, sigma = 0.00248")
 
 ```
 
 __*3.b.  Tuning.*__
 
-We tuned each candidate model's tuning parameter(s) using 5 repeats of 10-fold cross validation. The KNN model was tuned over a grid of `K` values ranging from 1 to 100 in increments of 5. The SVC model was tuned over a grid of 20 `cost` values ranging from *exp*(5) to *exp*(8). Finally, the SVM model was tuned over a grid of two parameters: 10 `cost` parameters ranging from *exp*(-1) to *exp*(4), and 10 `sigma` values ranging from *exp*(-6) to *exp*(-2).
+We tuned each candidate model's tuning parameter(s) using 5 repeats of 5-fold cross validation. The KNN model was tuned over a grid of `K` values ranging from 1 to 100 in increments of 5. The SVC model was tuned over a grid of 20 `cost` values ranging from *exp*(5) to *exp*(8). Finally, the SVM model was tuned over a grid of two parameters: 10 `cost` parameters ranging from *exp*(-1) to *exp*(4), and 10 `sigma` values ranging from *exp*(-6) to *exp*(-2). See Appendix II, **Supplemental Figures S2-S4** for tuning parameter plots for tuned models.
 
-Final candidate models were then compared using CV ROC distributions, and the final model was selected using the model with the lowest median CV ROC value. See Supplemental Figure S5 for information on model performance in test data.
+Final candidate models were then compared using CV ROC distributions, and the final model was selected using the model with the lowest median CV ROC value. **Figure 4** shows ROC, Sensitivity, and Specificity CV distributions for our tuned models.
 
 ```{r}
 
@@ -487,12 +453,11 @@ res <- resamples(list(GLM = glm.fit,
   )
 )
 
-bwplot(res,
-       main = "Figure 4. Median resample metrics, training set (5-fold repeated CV)")
+# Figure 4 below in Appendix
 
 ```
 
-Supplemental Figure S5 shows the test performance of the models using ROC curves: 
+See **Supplemental Figure S5** for information on model performance in test data.
 
 ```{r}
 glm.pred <- predict(glm.fit, newdata = test, type = "prob")[,2]
@@ -509,13 +474,14 @@ auc <- c(roc.glm$auc[1], roc.knn$auc[1], roc.svml$auc[1], roc.svmr$auc[1])
 
 # only move code below
 
-plot(roc.glm, legacy.axes = T)
-plot(roc.knn, col = 2, add = T)
-plot(roc.svml, col = 3, add = T)
-plot(roc.svmr, col = 4, add = T)
-modelNames <- c("glm", "knn", "svml", "svmr")
-legend("bottomright", legend = paste0(modelNames, ": ", round(auc, 3)), col = 1:4, lwd = 2)
-title(main = "Figure S5. ROC curves for all tuned models, test data", adj = 0, line = 2.5)
+# Figure S5 ROC test plots in Appendix 2 Supplementary Figures below
+# plot(roc.glm, legacy.axes = T)
+# plot(roc.knn, col = 2, add = T)
+# plot(roc.svml, col = 3, add = T)
+# plot(roc.svmr, col = 4, add = T)
+# modelNames <- c("glm", "knn", "svml", "svmr")
+# legend("bottomright", legend = paste0(modelNames, ": ", round(auc, 3)), col = 1:4, lwd = 2)
+# title(main = "Figure S5. ROC curves for all tuned models, test data", adj = 0, line = 2.5)
 
 ```
 
@@ -523,24 +489,26 @@ __*3.c.  Final Model.*__
 
 Using median ROC values found by repeated CV in our training data, our best model was the logistic regression model (noted GLM in figures). Of our models, the GLM has perhaps the strictest assumptions: it assumes a linear relationship between predictor values and log-odds of the expected outcome. 
 
-*3.c.i.   Test ROC value.* Upon evaluating the GLMl using our test data, the test ROC value was equal to `r roc.glm$auc[1]`.
+*3.c.i.   Test ROC value.* Upon evaluating the GLM using our test data, the test ROC value was equal to `r roc.glm$auc[1]`.
 
-*3.c.ii.  Important variables.* The most important variable in our final model, the ___ model, was ___.
+*3.c.ii.  Important variables.* **Figure 5** shows a variable importance plot of our GLM predictors, using the absolute value of the t-statistic for each model parameter as a measure of importance. Although this is an imperfect measure of variable importance, it gives a decent idea of which variables were most predictive of below-median oxygenation.
 
 ```{r}
 
 var_imp = varImp(glm.fit)
 
-ggplot(var_imp) +
-  theme_bw() +
-  labs(title = "Figure 5. Variable importance: Logistic (GLM) model, training data",
-       subtitle = "Year, PO4, NH4, and longitude were particularly important")
+# Figure 5 below in Appendix
 
 ```
 
 *3.c.iii. Visualization, interpretation, and limitations.* 
 
-```{r}
+(e.g. assumptions of final model, flexibility to capture underlying truth, limitations)
+
+**Figure 6** shows marginal predicted probability plots for selected predictors in our logistic model.
+
+
+```{r, results = FALSE}
 library(patchwork)
 library(margins)
 
@@ -585,15 +553,10 @@ marginal_grid =
   marginal("chlor", "Chlorophyll") +
   marginal("nh4", "Ammonium") +
   marginal("no2", "Nitrite")
-
-marginal_grid %>% wrap_elements() +
-  labs(title = "Figure 6. Predicted marginal probability of below-median oxygenation",
-       subtitle = "By selected predictors")
+  
+# Figure 6 below in Appendix
 
 ```
-
-
-(e.g. assumptions of final model, flexibility to capture underlying truth, limitations)
 
 ## 4. **Conclusions**
 
@@ -617,34 +580,198 @@ Watson AJ, Lenton TM, Mills BJW (2017). Ocean deoxygenation, the global phosphor
 
 \newpage
 
-# Appendix: Figures & Tables
+# Appendix: Main Figures
 
 <!-- Figure 1: Correlation matrix --> 
 
-```{r, fig.align = 'center', fig.fullwidth = TRUE}
+```{r, fig.align = 'center', fig.width = 12, fig.height = 12}
 # Correlation plot 
-# fig1 =
-  train %>% 
-  select(year, month_num, everything(), -outcome) %>% 
-  rename(NH4 = nh4, NO2 = no2, SiO3 = sio3, PO4 = po4,
-         chlorophyll = chlor,
-         phaeophytin = phaeo,
-         pressure = pres,
-         density = p_dens,
-         salinity = sal,
-         month = month_num) %>% 
-  mutate(month = as.numeric(month),
-         year = as.numeric(year)) %>% 
-  cor() %>% 
+
+train %>%
+  mutate(outcome = as.numeric(outcome),
+         year = as.numeric(year),
+         season = as.numeric(season)
+  ) %>%
+  cor() %>%
   ggcorrplot::ggcorrplot(type = "lower",
                          colors = c("#ED6A5A", "#FFFFF9", "#36C9C6"),
                          show.diag = FALSE,
                          lab = TRUE,
-                         lab_size = 1.75) +
-  labs(title = "Figure 1. Correlation matrix of features") +
+                         lab_size = 4) +
+  labs(title = "Figure 1. Correlation matrix of outcome and features",
+       subtitle = "CALCOFI, 2008-2016") +
   theme(plot.title.position = "plot",
         legend.position = "bottom")
+
 ```
+
+\newpage
+
+<!-- Figure 2: K-means cluster graph -->
+
+```{r, results = FALSE}
+a = print(km)
+```
+```{r}
+a$centers %>% as_tibble() %>% mutate(Cluster = as.factor(1:3)) %>% select(Cluster, everything()) %>% 
+rename(NH4 = nh4, NO2 = no2, SiO3 = sio3, PO4 = po4,
+     Temperature = temp_c,
+     Chlorophyll = chlor,
+     Phaeophytin = phaeo,
+     Pressure = pres,
+     Density = p_dens,
+     Salinity = sal,
+     Latitude = lat, Longitude = long) %>% 
+  pivot_longer(
+    Latitude:Chlorophyll,
+    names_to = "var",
+    values_to = "mean"
+  ) %>% 
+  ggplot(aes(x = var, y = mean, fill = Cluster)) +
+  geom_bar(stat = 'identity') +
+  facet_grid(~Cluster) +
+  labs(x = "",
+       y = "Centered/scaled mean value",
+       title = "Figure 2. K-means cluster analysis: Clusters by centered and scaled mean values",
+       subtitle = "CALCOFI, 2008-2016") +
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45,
+                               vjust = 1, 
+                               hjust = 1)
+  ) +
+  scale_fill_viridis_d("") 
+
+```
+
+\newpage
+
+<!-- Figure 3. Exploratory scatterplot trellis with featurePlot() -->
+
+```{r, fig.width = 12, fig.height = 12}
+
+featurePlot(x = train %>% select_if(is.numeric) %>% select(-lat,-long),
+            plot = "pairs",
+            y = train$outcome,
+            auto.key = list(columns = 2),
+            main = list(
+              "Figure 3. Scatterplot matrix: predictors vs. outcome (below-median ocean oxygenation)",
+              adj = 0),
+            scales = list(
+              x = list(cex = .1)
+              )
+            )
+
+```
+
+\newpage
+
+<!-- Figure 4. Resample plot -->
+
+```{r}
+
+bwplot(res,
+       main = "Figure 4. Median resample metrics, training set (5-fold repeated CV)")
+
+```
+
+\newpage
+
+<!-- Figure 5. Variable importance, GLM -->
+
+```{r}
+
+ggplot(var_imp) +
+  theme_bw() +
+  labs(title = "Figure 5. Variable importance: Logistic (GLM) model, training data",
+       subtitle = "Year, PO4, NH4, and longitude were particularly important")
+
+```
+
+\newpage
+
+<!-- Figure 6. Marginal probability plots -->
+
+```{r, fig.height = 7}
+
+marginal_grid %>% wrap_elements() +
+  labs(title = "Figure 6. Predicted marginal probability of below-median oxygenation",
+       subtitle = "By selected predictors")
+
+```
+
+\newpage 
+
+# Appendix II: Supplementary Figures
+
+<!-- Figure S1. Tuning: K-means cluster analysis -->
+
+```{r}
+
+fviz_nbclust(clust_data,
+             FUNcluster = kmeans,
+             method = "silhouette") +
+  labs(title = "Figure S1. Tuning K-means cluster analysis via silhouette method",
+       subtitle = "Optimal k value of 3")
+
+```
+
+\newpage
+
+<!-- Figure S2. KNN tuning plot -->
+
+```{r}
+
+ggplot(knn.fit, highlight = T) +
+  theme_bw() +
+  labs(title = "Figure S2. Tuning K-nearest neighbor model's `k` parameter using ROC",
+       subtitle = "Optimal k value of 11")
+
+```
+
+\newpage
+
+<!-- Figure S3. SVML tuning plot -->
+
+```{r}
+
+ggplot(svml, highlight = TRUE) +
+  theme_bw() +
+  labs(title = "Figure S3. Tuning linear support vector classifier model's cost parameter using ROC",
+       subtitle = "Optimal cost value of 6.31")
+
+```
+
+\newpage
+
+<!-- Figure S4. SVMR tuning plot -->
+
+```{r}
+
+ggplot(svmr, highlight = TRUE) +
+  theme_bw() +
+  labs(title = "Figure S4. Tuning radial support vector machine's cost and sigma parameters using ROC",
+       subtitle = "Cost = 244.69, sigma = 0.00248")
+
+```
+
+\newpage
+
+<!-- Figure S5. ROC test curves -->
+
+```{r}
+
+plot(roc.glm, legacy.axes = T)
+plot(roc.knn, col = 2, add = T)
+plot(roc.svml, col = 3, add = T)
+plot(roc.svmr, col = 4, add = T)
+modelNames <- c("glm", "knn", "svml", "svmr")
+legend("bottomright", legend = paste0(modelNames, ": ", round(auc, 3)), col = 1:4, lwd = 2)
+title(main = "Figure S5. ROC curves for all tuned models, test data", adj = 0, line = 2.5)
+
+```
+
 
 
 
