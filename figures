@@ -3,8 +3,8 @@ Appendix 1: Figures
 1. Correlation plot
 2. K-means cluster graph
 3. Exploratory scatterplot trellis with featurePlot()
-4. ROC plot
-5. Logistic plot 1: 
+4. Resample plot
+5. Logistic plot 1: Variable Importance
 6. Logistic plot 2:
 
 Appendix 2: Supplemental Figures
@@ -13,5 +13,4 @@ S1. Tuning: K-means cluster analysis
 S2. KNN tuning plot
 S3. SVML tuning plot
 S4. SVMR tuning plot
-S5. Resample plot
-S6. Test ROC curves
+S5. Test ROC curves
