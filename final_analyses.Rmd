@@ -541,8 +541,54 @@ ggplot(var_imp) +
 *3.c.iii. Visualization, interpretation, and limitations.* 
 
 ```{r}
+library(patchwork)
+library(margins)
 
+# # Predicted marginal probability plots
+# wrap_elements(~cplot(glm.model, "sal", se.type = "none", main = "Salinity")) +
+# wrap_elements(~cplot(glm.model, "temp_c", se.type = "none", main = "Temperature")) +
+# wrap_elements(~cplot(glm.model, "p_dens", se.type = "none", main = "Potential density")) +
+# wrap_elements(~cplot(glm.model, "po4", se.type = "none", main = "PO4")) +
+# wrap_elements(~cplot(glm.model, "sio3", se.type = "none", main = "SiO3")) +
+# wrap_elements(~cplot(glm.model, "chlor", se.type = "none", main = "Chlorophyll"))
 
+# Same model as in train()
+glm.model = glm(data = train,
+                formula = outcome ~ .,
+                family = binomial)
+
+marginal = function(predictor, title) {
+  
+  cdata = cplot(glm.model, paste0(predictor), draw = FALSE)
+  
+  ggplot(data = cdata, 
+         aes(x = xvals, y = yvals)
+  ) +
+    geom_line() +
+    labs(title = paste0(title),
+         x = "",
+         y = "") +
+    theme_bw() +
+    ylim(0,1) +
+    theme(
+      plot.title = element_text(hjust = 0.5)
+    )
+  
+}
+
+marginal_grid =
+  marginal("sal", "Salinity") + 
+  marginal("temp_c", "Temperature") + 
+  marginal("p_dens", "Potential density") + 
+  marginal("po4", "Phosphate") +
+  marginal("sio3", "Silicate") +
+  marginal("chlor", "Chlorophyll") +
+  marginal("nh4", "Ammonium") +
+  marginal("no2", "Nitrite")
+
+marginal_grid %>% wrap_elements() +
+  labs(title = "Figure 6. Predicted marginal probability of below-median oxygenation",
+       subtitle = "By selected predictors")
 
 ```
 
