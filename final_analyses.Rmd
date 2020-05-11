@@ -36,6 +36,7 @@ library(e1071)
 library(mlbench)
 library(pROC)
 library(factoextra)
+
 ```
 
 
@@ -142,14 +143,15 @@ median_oxy =
   ) %>% 
   as.numeric()
 
-# New oxy median - baseline year (2008)
-median_oxy_baseline = 
-  bottle_new %>% 
-  select(year, oxy) %>% 
-  mutate(year = as.numeric(as.character(year))) %>% 
-  filter(year == 2008) %>% 
-  summarize(median_baseline = median(oxy, na.rm = TRUE)) %>% 
-  as.numeric()
+# Alternate oxy median - baseline year (2008)
+  # No difference 
+# median_oxy_baseline = 
+#   bottle_new %>% 
+#   select(year, oxy) %>% 
+#   mutate(year = as.numeric(as.character(year))) %>% 
+#   filter(year == 2008) %>% 
+#   summarize(median_baseline = median(oxy, na.rm = TRUE)) %>% 
+#   as.numeric()
 
 data_pre =  
   bottle_new %>% 
@@ -185,8 +187,8 @@ data_pre =
   drop_na()           # Removing missing data
 
 
-data_pre %>% 
-  count(outcome)
+# data_pre %>% 
+#   count(outcome)
 
 # Downsampling to create class balance - class membership of data above are 3:1 Above:Below 
 set.seed(1)
@@ -201,8 +203,8 @@ data_pre_downsampled =
   as_tibble() %>% 
   select(-Class)                                         # Function creates redundant Class variable
 
-data_pre_downsampled %>% 
-  count(outcome)
+# data_pre_downsampled %>% 
+#   count(outcome)
 
 # Now equal
 
@@ -212,8 +214,8 @@ data_final =
   data_pre_downsampled %>% 
   sample_frac(0.05)
 
-data_final %>% 
-  count(outcome)
+# data_final %>% 
+#   count(outcome)
 # Still approx. 1:1 class ratio
 
 ```
@@ -245,7 +247,7 @@ rm(train_idx, bottle, bottle_new, cast)
 
 __*2.a.  Correlation.*__
 
-A correlation matrix was created (see Figure 1) to estimate linear (Pearson's) correlation values among all features. Several features were highly correlated, particularly the feature pairs temperature/potential density, SiO~3~/PO~4~, and PO~4~/potential density. Since correlation amongst predictors can cause problems, we were careful to consider these highly-correlated predictors in both model selection and interpretation.
+A correlation matrix was created (Figure 1) to estimate linear (Pearson's) correlation values among all features. Several features were highly correlated, particularly the feature pairs temperature/potential density, SiO~3~/PO~4~, and PO~4~/potential density. Since correlation amongst predictors can cause problems, we were careful to consider these highly-correlated predictors in both model selection and interpretation.
 
 ```{r}
 
@@ -284,7 +286,10 @@ clust_data =
 
 fviz_nbclust(clust_data,
              FUNcluster = kmeans,
-             method = "silhouette")
+             method = "silhouette") +
+  labs(title = "Figure S1. Tuning K-means cluster analysis via silhouette method",
+       subtitle = "Optimal k value of 3")
+
 set.seed(1)
 km <- kmeans(clust_data, centers = 3, nstart = 20)
 
@@ -305,8 +310,16 @@ library(viridis)
 
 a = print(km)
 a$centers %>% as_tibble() %>% mutate(Cluster = as.factor(1:3)) %>% select(Cluster, everything()) %>% 
+rename(NH4 = nh4, NO2 = no2, SiO3 = sio3, PO4 = po4,
+     Temperature = temp_c,
+     Chlorophyll = chlor,
+     Phaeophytin = phaeo,
+     Pressure = pres,
+     Density = p_dens,
+     Salinity = sal,
+     Latitude = lat, Longitude = long) %>% 
   pivot_longer(
-    lat:chlor,
+    Latitude:Chlorophyll,
     names_to = "var",
     values_to = "mean"
   ) %>% 
@@ -314,6 +327,7 @@ a$centers %>% as_tibble() %>% mutate(Cluster = as.factor(1:3)) %>% select(Cluste
   geom_bar(stat = 'identity') +
   facet_grid(~Cluster) +
   labs(x = "",
+       y = "Centered/scaled mean value",
        title = "Figure 2. K-means cluster analysis: Clusters by centered and scaled mean values",
        subtitle = "CALCOFI, 2008-2016") +
   theme_bw() +
@@ -383,7 +397,10 @@ set.seed(1)
 # saveRDS(knn.fit, './models/knn.RDS')
 knn.fit = readRDS('./models/knn.RDS')
 
-ggplot(knn.fit, highlight = T)
+ggplot(knn.fit, highlight = T) +
+  theme_bw() +
+  labs(title = "Figure S2. Tuning K-nearest neighbor model's `k` parameter using ROC",
+       subtitle = "Optimal k value of 11")
 
 ```
 
@@ -404,13 +421,10 @@ set.seed(1)
 # saveRDS(svml, './models/svml.RDS')
 svml = readRDS('./models/svml.RDS')
 
-ggplot(svml, highlight = TRUE)
-
-# Try this to visualize
-# kernlab::plot(svml$finalModel,
-#      train,
-#      formula = outcome ~ chlor)
-# plot(svml, train)
+ggplot(svml, highlight = TRUE) +
+  theme_bw() +
+  labs(title = "Figure S3. Tuning linear support vector classifier model's cost parameter using ROC",
+       subtitle = "Optimal cost value of 6.31")
 
 ```
 
@@ -432,20 +446,18 @@ set.seed(1)
 # saveRDS(svmr, './models/svmr.RDS')
 svmr = readRDS('./models/svmr.RDS')
 
-ggplot(svmr, highlight = TRUE)
-
-# Try these to visualize
-# plot(svmr$finalModel)
-# plot(svmr, train)
+ggplot(svmr, highlight = TRUE) +
+  theme_bw() +
+  labs(title = "Figure S4. Tuning radial support vector machine's cost and sigma parameters using ROC",
+       subtitle = "Cost = 244.69, sigma = 0.00248")
 
 ```
-
 
 __*3.b.  Tuning.*__
 
 We tuned each candidate model's tuning parameter(s) using 5 repeats of 10-fold cross validation. The KNN model was tuned over a grid of `K` values ranging from 1 to 100 in increments of 5. The SVC model was tuned over a grid of 20 `cost` values ranging from *exp*(5) to *exp*(8). Finally, the SVM model was tuned over a grid of two parameters: 10 `cost` parameters ranging from *exp*(-1) to *exp*(4), and 10 `sigma` values ranging from *exp*(-6) to *exp*(-2).
 
-Final candidate models were then compared using CV accuracy and ROC distributions, and the final model was selected using the model with the lowest median CV ROC value. More details can be found in the submitted RMarkdown file.
+Final candidate models were then compared using CV ROC distributions, and the final model was selected using the model with the lowest median CV ROC value. See Supplemental Figures S5 and S6 for information on model performance in training and test data.
 
 ```{r}
 
@@ -456,11 +468,12 @@ res <- resamples(list(GLM = glm.fit,
   )
 )
 
-bwplot(res)
+bwplot(res,
+       main = "Figure S5. Median resample metrics, training set (5-fold repeated CV)")
 
 ```
 
-The following plot shows the test performance of the models using ROC curves: 
+Supplemental Figure S6 shows the test performance of the models using ROC curves: 
 
 ```{r}
 glm.pred <- predict(glm.fit, newdata = test, type = "prob")[,2]
@@ -481,6 +494,8 @@ plot(roc.svml, col = 3, add = T)
 plot(roc.svmr, col = 4, add = T)
 modelNames <- c("glm", "knn", "svml", "svmr")
 legend("bottomright", legend = paste0(modelNames, ": ", round(auc, 3)), col = 1:4, lwd = 2)
+title(main = "Figure S6. ROC curves for all tuned models, test data", adj = 0, line = 2.5)
+
 ```
 
 [...]
