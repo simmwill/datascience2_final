@@ -277,6 +277,11 @@ In Figure 2, we plotted K-means clusters by scaled and centered mean values for 
 
 ```{r}
 
+clust_data =
+  train %>% 
+  select_if(is.numeric) %>% 
+  scale()
+
 fviz_nbclust(clust_data,
              FUNcluster = kmeans,
              method = "silhouette")
