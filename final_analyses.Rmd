@@ -505,7 +505,8 @@ var_imp = varImp(glm.fit)
 
 (e.g. assumptions of final model, flexibility to capture underlying truth, limitations)
 
-**Figure 6** shows marginal predicted probability plots for selected predictors in our logistic model.
+**Figure 6** shows marginal predicted probability plots for selected predictors in our logistic model. 
+The logistic regression model does not require the assumptions of the OLS models. Binary logistic regression requires the dependent variable to be binary and the class probabilities of the dependent variable must be independent of each other. The limitations of logistic regression is that it is unable to solve non-linear problems as it assumes a linear decision boundary. It is also unable to handle multiple collinearity among the predictors as efficiently. 
 
 
 ```{r, results = FALSE}
@@ -562,7 +563,7 @@ marginal_grid =
 
 __*4.a.  Summary of findings.*__ 
 
-...
+In this analysis, we have evaluated several models to predict whether the ocean oxygenation level will be above or below the median of the year between 2006-2016 given a set of predictors. Based on cross-validation, the generalized linear model has the lowest test error and the highest test ROC value among the fitted models. This might be due to the fact that the magnitude of pearson's correlation coefficients between outcome class membership and the predictors is considerably high as shown in Figure 1 of the Appendix. Among the 14 predictors, the year, longitude and concentration of PO~4~ and NH~4~ seems to be highly predictive of the oxygenation level. We find that the prediction accuracy of the SVM with Linear Kernel is higher than the SVM with Radial Kernel. This further supports that the predictors might be linearly associated with the log odds of oxygenation being above or below the median. 
 
 __*4.b.  Limitations of findings.*__
 
