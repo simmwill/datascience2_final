@@ -54,7 +54,7 @@ Thus, we wanted to answer the questions: what factors predict ocean deoxygenatio
 
 We are using data from the California Cooperative Oceanic Fisheries Investigations (CalCOFI), which we downloaded from [\underline{Kaggle}](https://www.kaggle.com/sohier/calcofi). CalCOFI’s data represent the longest oceanographic time series in the world, spanning the years 1949 to 2016. Measured off the coast of California, the dataset includes larval and egg abundance data on 250+ species, as well as oceanographic data such as water temperature, salinity, chlorophyll, and oxygenation.
 
-Our primary outcome for these classification models is dissolved seawater oxygen in µmol/Kg, and whether a given observation is **above/below the median value for our dataset**.. A list of 14 predictors can be found in the Models section.
+Our primary outcome for these classification models is dissolved seawater oxygen in µmol/Kg, and whether a given observation is **above/below the median value for our dataset**. A list of 14 predictors can be found in the Models section.
 
 *Data cleaning and preparation.*
 
@@ -247,7 +247,7 @@ rm(train_idx, bottle, bottle_new, cast)
 
 __*2.a.  Correlation.*__
 
-We created a correlation matrix (**Figure 1**) to estimate linear (Pearson's) correlation values among all features. Several features were highly correlated, particularly the feature pairs temperature/potential density, SiO~3~/PO~4~, and PO~4~/potential density. Since correlation amongst predictors can cause problems, we were careful to consider these highly-correlated predictors in both model selection and interpretation.
+We created a correlation matrix (**Figure 1**) to estimate linear (Pearson's) correlation values among all features and a binary measure of our outcome. Several features were highly correlated, particularly the feature pairs temperature/potential density, SiO~3~/PO~4~, and PO~4~/potential density. Since correlation amongst predictors can cause problems, we were careful to consider these highly-correlated predictors in both model selection and interpretation.
 
 ```{r}
 # Figure 1 below in Appendix 1
@@ -330,7 +330,7 @@ __*3.a.  Candidate models.*__
 
 For each candidate model, the 14 predictors included were as follows: year, season, latitude and longitude (decimals), temperature (°C), salinity (PSS-78 scale), potential water density (kg/m^3^), pressure (decibars), phaeophytin (µg/L), chlorophyll (µg/L), phosphate (µmol/L), silicate (µmol/L), nitrite (µmol/L), and ammonium (µmol/L).
 
-We began by fitting several models using `caret::train()` using our training data, and comparing them using their respective cross-validated (CV) Accuracy and ROC values. **Figure 3** details the cross-validated distribution of model metrics for each model.
+We began by fitting several models using `caret::train()` using our training data, and comparing them using their respective cross-validated (CV) ROC values. **Figure 3** details the cross-validated distribution of model metrics for each model.
 
 We began with a logistic regression model as a baseline model. We then compared this with more flexible methods: K-nearest neighbors (KNN), a support vector classifier with a linear kernel (SVC), and a support vector machine with a radial kernel (SVM). 
 
@@ -442,7 +442,7 @@ __*3.b.  Tuning.*__
 
 We tuned each candidate model's tuning parameter(s) using 5 repeats of 5-fold cross validation. The KNN model was tuned over a grid of `K` values ranging from 1 to 100 in increments of 5. The SVC model was tuned over a grid of 20 `cost` values ranging from *exp*(5) to *exp*(8). Finally, the SVM model was tuned over a grid of two parameters: 10 `cost` parameters ranging from *exp*(-1) to *exp*(4), and 10 `sigma` values ranging from *exp*(-6) to *exp*(-2). See Appendix II, **Supplemental Figures S2-S4** for tuning parameter plots for tuned models.
 
-Final candidate models were then compared using CV ROC distributions, and the final model was selected using the model with the lowest median CV ROC value. **Figure 4** shows ROC, Sensitivity, and Specificity CV distributions for our tuned models.
+Final candidate models were then compared using CV ROC distributions, and the final model was selected using the model with the highest median CV ROC value. **Figure 4** shows ROC, Sensitivity, and Specificity CV distributions for our tuned models.
 
 ```{r}
 
@@ -487,7 +487,7 @@ auc <- c(roc.glm$auc[1], roc.knn$auc[1], roc.svml$auc[1], roc.svmr$auc[1])
 
 __*3.c.  Final Model.*__
 
-Using median ROC values found by repeated CV in our training data, our best model was the logistic regression model (noted GLM in figures). Of our models, the GLM has perhaps the strictest assumptions: it assumes a linear relationship between predictor values and log-odds of the expected outcome. 
+Using median ROC values found by repeated CV in our training data, our best model was the logistic regression model (noted GLM in figures). Of our models, the GLM has perhaps the strictest assumptions (see section *3.c.iii.* below.)
 
 *3.c.i.   Test ROC value.* Upon evaluating the GLM using our test data, the test ROC value was equal to `r roc.glm$auc[1]`.
 
@@ -503,11 +503,10 @@ var_imp = varImp(glm.fit)
 
 *3.c.iii. Visualization, interpretation, and limitations.* 
 
-(e.g. assumptions of final model, flexibility to capture underlying truth, limitations)
-
 **Figure 6** shows marginal predicted probability plots for selected predictors in our logistic model. 
-The logistic regression model does not require the assumptions of the OLS models. Binary logistic regression requires the dependent variable to be binary and the class probabilities of the dependent variable must be independent of each other. The limitations of logistic regression is that it is unable to solve non-linear problems as it assumes a linear decision boundary. It is also unable to handle multiple collinearity among the predictors as efficiently. 
+The logistic regression model does not require the assumptions of the OLS models. Binary logistic regression requires the dependent variable to be binary and the class probabilities of the dependent variable must be independent of each other. A major limitation of logistic regression is that it is unable to solve non-linear problems as it assumes a linear decision boundary. It is also unable to handle multiple collinearity among the predictors as efficiently. 
 
+In **Figure 6**, we see that as salinity increases, probability of below-median oxygenation decreases; for temperature, potential water density, phosphates, silicates, and chlorophyll, this effect is opposite (i.e. as these increase, probability of below-median oxygenation increases). Ammonium and nitrite had little predictive ability. However, it is important to note that such marginal predicted probability plots are average trends for each predictor holding other variables constant. In addition, there was high correlation among features, which may prevent interpretation of individual predictors.
 
 ```{r, results = FALSE}
 library(patchwork)
@@ -563,7 +562,7 @@ marginal_grid =
 
 __*4.a.  Summary of findings.*__ 
 
-In this analysis, we have evaluated several models to predict whether the ocean oxygenation level will be above or below the median of the year between 2006-2016 given a set of predictors. Based on cross-validation, the generalized linear model has the lowest test error and the highest test ROC value among the fitted models. This might be due to the fact that the magnitude of pearson's correlation coefficients between outcome class membership and the predictors is considerably high as shown in Figure 1 of the Appendix. Among the 14 predictors, the year, longitude and concentration of PO~4~ and NH~4~ seems to be highly predictive of the oxygenation level. We find that the prediction accuracy of the SVM with Linear Kernel is higher than the SVM with Radial Kernel. This further supports that the predictors might be linearly associated with the log odds of oxygenation being above or below the median. 
+In this analysis, we have evaluated several models to predict whether the ocean oxygenation level will be above or below the median of the year between 2006-2016 given a set of predictors. Based on cross-validation, the generalized linear model had the highest training and test ROC values among the fitted models. This may be related to the fact that the magnitude of pearson's correlation coefficients between outcome class membership and the predictors is considerably high, as shown in **Figure 1** of the Appendix. Among the 14 predictors, the year, longitude, and concentration of PO~4~ and NH~4~ were highly predictive of  oxygenation level. We also found that the prediction accuracy of the SVM with Linear Kernel was higher than the SVM with Radial Kernel. This further supports that the predictors might be linearly associated with the log odds of oxygenation being above or below the median. 
 
 __*4.b.  Limitations of findings.*__
 
